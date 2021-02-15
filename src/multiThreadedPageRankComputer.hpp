@@ -21,35 +21,40 @@ public:
             : numThreads(numThreadsArg) {};
 
     // Distributes job(0),job(1),...,job(n) across multiple threads
-    // and returns merges results.
-    template<template<typename> container, typename T>
-    T pool(typename container<T>::iterator begin, typename container<T>::iterator end, std::function<R(T)> job, std::function<void(R & , R)> mergeResults, R init) const {
+    // and returns future results.
+    template<template<typename> class container, typename T, typename S>
+    std::vector<std::future<T>> pool(typename container<T>::iterator begin, typename container<T>::iterator end, std::function<void(T &, S &)> job, S init) const {
 
-        std::atomic<typename container<T>::iterator> it;
+        auto it = begin;
+        std::mutex itMutex;
 
-        auto worker = [&]() -> R {
-            R result = init;
-            int64_t jobIndex;
-            while ((jobIndex = nn--) >= 0)
-                mergeResults(result, job(jobIndex));
-            return result;
+        auto getJob = [&]() -> auto {
+            const std::lock_guard<std::mutex> lockGuard(itMutex);
+            return (it == end) ? end : (it++);
         };
 
-        std::future<T> results[numThreads];
+        auto worker = [&]() -> S {
+            S state = init;
+            int64_t jobIndex;
+            while ((jobIndex = getJob()) != end)
+                job(jobIndex, state);
+            return state;
+        };
+
+        std::vector<std::future<T>> results;
+        results.reserve(numThreads);
 
         for (uint32_t i = 0; i < numThreads; i++)
-            results[i] = std::async(worker);
+            results.push_back(std::async(worker));
 
-        T finalResult = init;
-        // TODO binary tree
-        for (std::future<T> &result : results)
-            mergeResults(finalResult, result.get());
-
-        return finalResult;
+        return results;
     }
 
-    template<typename T, typename U>
-    T poolVector(<U> container, uint32_t n, std::function<T(U)> job, std::function<void(T &, T)> mergeResults, T init)
+    template<typename T>
+    void waitForAll(std::vector<std::future<T>> futures) {
+        for (std::future<T> &future : futures)
+            future.wait();
+    }
 
     std::vector<PageIdAndRank> computeForNetwork(Network const &network, double alpha, uint32_t iterations, double tolerance) const {
 
