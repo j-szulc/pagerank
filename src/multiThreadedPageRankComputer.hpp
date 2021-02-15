@@ -14,8 +14,13 @@
 #include "immutable/network.hpp"
 #include "immutable/pageIdAndRank.hpp"
 #include "immutable/pageRankComputer.hpp"
+#include "sha256IdGenerator.hpp"
 
 class MultiThreadedPageRankComputer : public PageRankComputer {
+
+    using Nothing = struct {
+    };
+
 public:
     MultiThreadedPageRankComputer(uint32_t numThreadsArg)
             : numThreads(numThreadsArg) {};
@@ -51,19 +56,23 @@ public:
     }
 
     template<typename T>
-    void waitForAll(std::vector<std::future<T>> futures) {
+    void waitForAll(std::vector<std::future<T>> futures) const {
         for (std::future<T> &future : futures)
             future.wait();
     }
 
     std::vector<PageIdAndRank> computeForNetwork(Network const &network, double alpha, uint32_t iterations, double tolerance) const {
 
-        //std::vector<PageIdAndRank> result;
-        std::unordered_map<PageId, PageRank, PageIdHash> pageHashMap;
         std::vector<Page> const &pages = network.getPages();
-        IdGenerator const &generator = network.getGenerator();
+        Sha256IdGenerator generator{};
 
-        pageHashMap[page.getId()] = 1.0 / network.getSize();
+        std::function<void(Page &, Nothing &)> generatingFun = [generator](Page &page, Nothing &) { page.generateId(generator); };
+        waitForAll(pool<std::vector, Page, Nothing>(pages.begin(), pages.end(), generatingFun, {}));
+
+        std::unordered_map<PageId, PageRank, PageIdHash> pageHashMap;
+        for (auto const &page : network.getPages()) {
+            pageHashMap[page.getId()] = 1.0 / network.getSize();
+        }
 
 
         std::unordered_map<PageId, uint32_t, PageIdHash> numLinks;
