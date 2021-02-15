@@ -21,34 +21,103 @@ public:
             : numThreads(numThreadsArg) {};
 
     // Distributes job(0),job(1),...,job(n) across multiple threads
-    // and returns AND of the results.
-    bool poolAnd(uint32_t n, std::function<bool(int)> job) const {
+    // and returns merges results.
+    template<template<typename> container, typename T>
+    T pool(typename container<T>::iterator begin, typename container<T>::iterator end, std::function<R(T)> job, std::function<void(R & , R)> mergeResults, R init) const {
 
-        std::atomic_int64_t nn(n);
+        std::atomic<typename container<T>::iterator> it;
 
-        auto worker = [&]() -> bool {
-            bool result = true;
+        auto worker = [&]() -> R {
+            R result = init;
             int64_t jobIndex;
             while ((jobIndex = nn--) >= 0)
-                result = result && job(jobIndex);
+                mergeResults(result, job(jobIndex));
             return result;
         };
 
-        std::future<bool> results[numThreads];
+        std::future<T> results[numThreads];
 
         for (uint32_t i = 0; i < numThreads; i++)
             results[i] = std::async(worker);
 
-        bool finalResult = true;
-        for (std::future<bool> &result : results)
-            finalResult = finalResult && result.get();
+        T finalResult = init;
+        // TODO binary tree
+        for (std::future<T> &result : results)
+            mergeResults(finalResult, result.get());
 
         return finalResult;
     }
 
-    std::vector<PageIdAndRank> computeForNetwork(Network const & /*network*/, double /*alpha*/, uint32_t /*iterations*/, double /*tolerance*/) const {
-        std::vector<PageIdAndRank> result;
-        return result;
+    template<typename T, typename U>
+    T poolVector(<U> container, uint32_t n, std::function<T(U)> job, std::function<void(T &, T)> mergeResults, T init)
+
+    std::vector<PageIdAndRank> computeForNetwork(Network const &network, double alpha, uint32_t iterations, double tolerance) const {
+
+        //std::vector<PageIdAndRank> result;
+        std::unordered_map<PageId, PageRank, PageIdHash> pageHashMap;
+        std::vector<Page> const &pages = network.getPages();
+        IdGenerator const &generator = network.getGenerator();
+
+        pageHashMap[page.getId()] = 1.0 / network.getSize();
+
+
+        std::unordered_map<PageId, uint32_t, PageIdHash> numLinks;
+        for (auto page : network.getPages()) {
+            numLinks[page.getId()] = page.getLinks().size();
+        }
+
+        std::unordered_set<PageId, PageIdHash> danglingNodes;
+        for (auto page : network.getPages()) {
+            if (page.getLinks().size() == 0) {
+                danglingNodes.insert(page.getId());
+            }
+        }
+
+        std::unordered_map<PageId, std::vector<PageId>, PageIdHash> edges;
+        for (auto page : network.getPages()) {
+            for (auto link : page.getLinks()) {
+                edges[link].push_back(page.getId());
+            }
+        }
+
+        for (uint32_t i = 0; i < iterations; ++i) {
+            std::unordered_map<PageId, PageRank, PageIdHash> previousPageHashMap = pageHashMap;
+
+            double dangleSum = 0;
+            for (auto danglingNode : danglingNodes) {
+                dangleSum += previousPageHashMap[danglingNode];
+            }
+            dangleSum = dangleSum * alpha;
+
+            double difference = 0;
+            for (auto &pageMapElem : pageHashMap) {
+                PageId pageId = pageMapElem.first;
+
+                double danglingWeight = 1.0 / network.getSize();
+                pageMapElem.second = dangleSum * danglingWeight + (1.0 - alpha) / network.getSize();
+
+                if (edges.count(pageId) > 0) {
+                    for (auto link : edges[pageId]) {
+                        pageMapElem.second += alpha * previousPageHashMap[link] / numLinks[link];
+                    }
+                }
+                difference += std::abs(previousPageHashMap[pageId] - pageHashMap[pageId]);
+            }
+
+            std::vector<PageIdAndRank> result;
+            for (auto iter : pageHashMap) {
+                result.push_back(PageIdAndRank(iter.first, iter.second));
+            }
+
+            ASSERT(result.size() == network.getSize(), "Invalid result size=" << result.size() << ", for network" << network);
+
+            if (difference < tolerance) {
+                return result;
+            }
+        }
+
+        ASSERT(false, "Not able to find result in iterations=" << iterations);
+
     }
 
     std::string getName() const {
