@@ -28,6 +28,8 @@ class MultiThreadedPageRankComputer : public PageRankComputer {
     using Nothing = struct {
     };
 
+    using PageRankHashMap = std::unordered_map<PageId, PageRank, PageIdHash>;
+
 public:
     MultiThreadedPageRankComputer(uint32_t numThreadsArg)
             : numThreads(numThreadsArg) {};
@@ -83,10 +85,13 @@ public:
         std::function<void(Page const &)> generatingFun = [generator](Page const &page) { page.generateId(generator); };
         poolAndWait(pages.begin(), pages.end(), generatingFun);
 
-        std::unordered_map<PageId, PageRank, PageIdHash> pageHashMap;
+        PageRankHashMap map1;
+        PageRankHashMap map2;
+
         auto initialPageRank = 1.0 / network.getSize();
         for (auto const &page : pages) {
-            pageHashMap[page.getId()] = initialPageRank;
+            map1[page.getId()] = initialPageRank;
+            map2[page.getId()] = initialPageRank;
         }
 
         std::unordered_map<PageId, uint32_t, PageIdHash> numLinks;
@@ -108,17 +113,20 @@ public:
             }
         }
 
+        PageRankHashMap *previousPageHashMap = &map1;
+        PageRankHashMap *pageHashMap = &map2;
+
         for (uint32_t i = 0; i < iterations; ++i) {
-            std::unordered_map<PageId, PageRank, PageIdHash> previousPageHashMap = pageHashMap;
+            swap(previousPageHashMap, pageHashMap);
 
             double dangleSum = 0;
             for (auto danglingNode : danglingNodes) {
-                dangleSum += previousPageHashMap[danglingNode];
+                dangleSum += (*previousPageHashMap)[danglingNode];
             }
             dangleSum = dangleSum * alpha;
 
             double difference = 0;
-            for (auto &pageMapElem : pageHashMap) {
+            for (auto &pageMapElem : *pageHashMap) {
                 PageId pageId = pageMapElem.first;
 
                 double danglingWeight = 1.0 / network.getSize();
@@ -126,14 +134,14 @@ public:
 
                 if (edges.count(pageId) > 0) {
                     for (auto link : edges[pageId]) {
-                        pageMapElem.second += alpha * previousPageHashMap[link] / numLinks[link];
+                        pageMapElem.second += alpha * (*previousPageHashMap)[link] / numLinks[link];
                     }
                 }
-                difference += std::abs(previousPageHashMap[pageId] - pageHashMap[pageId]);
+                difference += std::abs((*previousPageHashMap)[pageId] - (*pageHashMap)[pageId]);
             }
 
             std::vector<PageIdAndRank> result;
-            for (auto iter : pageHashMap) {
+            for (auto iter : *pageHashMap) {
                 result.push_back(PageIdAndRank(iter.first, iter.second));
             }
 
