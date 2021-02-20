@@ -1,6 +1,9 @@
 
+#include <iostream>
 #include "lib/networkGenerator.hpp"
 #include "../src/multiThreadedPageRankComputer.hpp"
+
+using namespace std;
 
 int main() {
 
@@ -21,5 +24,8 @@ int main() {
     n.addPage(p2);
     n.addPage(p3);
     MultiThreadedPageRankComputer m(2);
-    m.computeForNetwork(n, 2, 10, 0.1);
+
+    for (auto x : m.computeForNetwork(n, 0.85, 100, 0.0000001)) {
+        cout << x << endl;
+    };
 }
