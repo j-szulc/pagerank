@@ -84,18 +84,18 @@ public:
         poolAndWait(pages.begin(), pages.end(), generatingFun);
 
         std::unordered_map<PageId, PageRank, PageIdHash> pageHashMap;
-        for (auto const &page : network.getPages()) {
-            pageHashMap[page.getId()] = 1.0 / network.getSize();
+        auto initialPageRank = 1.0 / network.getSize();
+        for (auto const &page : pages) {
+            pageHashMap[page.getId()] = initialPageRank;
         }
 
-
         std::unordered_map<PageId, uint32_t, PageIdHash> numLinks;
-        for (auto page : network.getPages()) {
+        for (auto page : pages) {
             numLinks[page.getId()] = page.getLinks().size();
         }
 
         std::unordered_set<PageId, PageIdHash> danglingNodes;
-        for (auto page : network.getPages()) {
+        for (auto page : pages) {
             if (page.getLinks().size() == 0) {
                 danglingNodes.insert(page.getId());
             }
