@@ -7,6 +7,13 @@
 #include <functional>
 #include <future>
 
+#ifndef DNDEBUG
+
+#include <iostream>
+
+using namespace std;
+#endif
+
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -27,26 +34,26 @@ public:
 
     // Distributes job(0),job(1),...,job(n) across multiple threads
     // and returns future results.
-    template<template<typename> class container, typename T, typename S>
-    std::vector<std::future<T>> pool(typename container<T>::iterator begin, typename container<T>::iterator end, std::function<void(T &, S &)> job, S init) const {
+    template<typename T, typename S, typename Iterator>
+    std::vector<std::future<S>> pool(Iterator begin, Iterator end, std::function<void(T, S &)> work, S init) const {
 
-        auto it = begin;
-        std::mutex itMutex;
+        auto it = make_shared<Iterator>(begin);
+        auto itMutex = make_shared<std::mutex>();
 
-        auto getJob = [&]() -> auto {
-            const std::lock_guard<std::mutex> lockGuard(itMutex);
-            return (it == end) ? end : (it++);
+        auto getJob = [=]() -> auto {
+            const std::lock_guard<std::mutex> lockGuard(*itMutex);
+            return (*it == end) ? end : ((*it)++);;
         };
 
-        auto worker = [&]() -> S {
+        auto worker = [=]() -> S {
             S state = init;
-            int64_t jobIndex;
-            while ((jobIndex = getJob()) != end)
-                job(jobIndex, state);
+            Iterator nextJob;
+            while ((nextJob = getJob()) != end)
+                work(*nextJob, state);
             return state;
         };
 
-        std::vector<std::future<T>> results;
+        std::vector<std::future<S>> results;
         results.reserve(numThreads);
 
         for (uint32_t i = 0; i < numThreads; i++)
@@ -56,18 +63,25 @@ public:
     }
 
     template<typename T>
-    void waitForAll(std::vector<std::future<T>> futures) const {
+    void waitForAll(std::vector<std::future<T>> &futures) const {
         for (std::future<T> &future : futures)
             future.wait();
     }
 
+    template<typename T, typename Iterator>
+    void poolAndWait(Iterator begin, Iterator end, std::function<void(T)> work) const {
+        std::function<void(T, Nothing &)> workAndReturnNothing = [work](T t, Nothing &) { work(t); };
+        auto futures = pool(begin, end, workAndReturnNothing, {});
+        waitForAll(futures);
+    }
+
     std::vector<PageIdAndRank> computeForNetwork(Network const &network, double alpha, uint32_t iterations, double tolerance) const {
 
-        std::vector<Page> const &pages = network.getPages();
+        auto &pages = network.getPages();
         Sha256IdGenerator generator{};
 
-        std::function<void(Page &, Nothing &)> generatingFun = [generator](Page &page, Nothing &) { page.generateId(generator); };
-        waitForAll(pool<std::vector, Page, Nothing>(pages.begin(), pages.end(), generatingFun, {}));
+        std::function<void(Page const &)> generatingFun = [generator](Page const &page) { page.generateId(generator); };
+        poolAndWait(pages.begin(), pages.end(), generatingFun);
 
         std::unordered_map<PageId, PageRank, PageIdHash> pageHashMap;
         for (auto const &page : network.getPages()) {
