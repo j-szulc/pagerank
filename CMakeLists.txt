@@ -15,7 +15,6 @@ macro(add_executable _name)
     endif ()
 endmacro()
 
-add_executable(scratchy test.cc)
 
 add_subdirectory(tests)
 

@@ -2,10 +2,10 @@
 #define SRC_MULTITHREADEDPAGERANKCOMPUTER_HPP_
 
 #include <atomic>
-#include <mutex>
-#include <thread>
 #include <functional>
 #include <future>
+#include <mutex>
+#include <thread>
 
 #ifndef DNDEBUG
 
@@ -160,7 +160,6 @@ public:
         }
 
         ASSERT(false, "Not able to find result in iterations=" << iterations);
-
     }
 
     std::string getName() const {

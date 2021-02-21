@@ -3,15 +3,13 @@
 
 #include "immutable/idGenerator.hpp"
 #include "immutable/pageId.hpp"
-#include <unistd.h>
-#include <sys/wait.h>
-#include <fstream>
 #include <cstdio>
-
+#include <fstream>
+#include <sys/wait.h>
+#include <unistd.h>
 
 class Sha256IdGenerator : public IdGenerator {
 public:
-
     PageId generateId(std::string const &content) const {
         char shaIn[L_tmpnam];
         char shaOut[L_tmpnam];

@@ -98,13 +98,13 @@ public:
             : NetworkGenerator(idGeneratorArg) {
     }
 
-    Network generateNetworkOfSize(uint32_t const /*size*/) const {
+    Network generateNetworkOfSize(uint32_t const size) const {
         Network network(this->idGenerator);
 
         std::string numberOfNodesStr;
         std::getline(std::cin, numberOfNodesStr);
         uint32_t numberOfNodes = std::stoul(numberOfNodesStr);
-        //ASSERT(numberOfNodes == size, "Incorrect size=" << size << ", fromStdin=" << numberOfNodes);
+        ASSERT(numberOfNodes == size, "Incorrect size=" << size << ", fromStdin=" << numberOfNodes);
 
         for (uint32_t i = 0; i < numberOfNodes; ++i) {
             std::string content;
