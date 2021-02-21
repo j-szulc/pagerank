@@ -59,7 +59,7 @@ public:
         results.reserve(numThreads);
 
         for (uint32_t i = 0; i < numThreads; i++) {
-            results.push_back(std::async(worker));
+            results.push_back(std::async(std::launch::async, worker));
         }
         return results;
     }
@@ -119,10 +119,11 @@ public:
         for (uint32_t i = 0; i < iterations; ++i) {
             swap(previousPageHashMap, pageHashMap);
 
+            std::function<void(PageId, double &)> summingFun = [&](PageId danglingNode, double &state) { state += (*previousPageHashMap)[danglingNode]; };
+            auto dangleSumFutures = pool(danglingNodes.begin(), danglingNodes.end(), summingFun, (double) 0);
             double dangleSum = 0;
-            for (auto danglingNode : danglingNodes) {
-                dangleSum += (*previousPageHashMap)[danglingNode];
-            }
+            for (auto &future : dangleSumFutures)
+                dangleSum += future.get();
             dangleSum = dangleSum * alpha;
 
             std::function<void(PageRankHashMap::value_type & , double & )> processPageFun = [&](PageRankHashMap::value_type &pageMapElem, double &difference) {
@@ -139,12 +140,11 @@ public:
                 difference += std::abs((*previousPageHashMap)[pageId] - (*pageHashMap)[pageId]);
             };
 
-            auto futures = pool(pageHashMap->begin(), pageHashMap->end(), processPageFun, (double) 0);
+            auto rankFutures = pool(pageHashMap->begin(), pageHashMap->end(), processPageFun, (double) 0);
             double difference = 0;
-            for (std::future<double> &future : futures) {
+            for (auto &future : rankFutures) {
                 difference += future.get();
             }
-
 
             if (difference < tolerance) {
                 std::vector<PageIdAndRank> result;

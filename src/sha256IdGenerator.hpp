@@ -8,8 +8,6 @@
 #include <fstream>
 #include <cstdio>
 
-#define BUF_SIZE 64
-#define FD_MAX 1023
 
 class Sha256IdGenerator : public IdGenerator {
 public:
