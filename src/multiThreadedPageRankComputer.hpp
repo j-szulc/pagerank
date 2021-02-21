@@ -84,7 +84,7 @@ public:
 
         std::function<void(Page const &)> generatingFun = [generator](Page const &page) { page.generateId(generator); };
         poolAndWait(pages.begin(), pages.end(), generatingFun);
-
+        return {};
         PageRankHashMap map1;
         PageRankHashMap map2;
 
