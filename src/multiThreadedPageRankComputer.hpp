@@ -80,11 +80,11 @@ public:
     std::vector<PageIdAndRank> computeForNetwork(Network const &network, double alpha, uint32_t iterations, double tolerance) const {
 
         auto &pages = network.getPages();
-        Sha256IdGenerator generator{};
+        auto &generator = network.getGenerator();
 
-        std::function<void(Page const &)> generatingFun = [generator](Page const &page) { page.generateId(generator); };
+        std::function<void(Page const &)> generatingFun = [&](Page const &page) { page.generateId(generator); };
         poolAndWait(pages.begin(), pages.end(), generatingFun);
-        return {};
+
         PageRankHashMap map1;
         PageRankHashMap map2;
 
