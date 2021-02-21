@@ -58,9 +58,9 @@ public:
         std::vector<std::future<S>> results;
         results.reserve(numThreads);
 
-        for (uint32_t i = 0; i < numThreads; i++)
+        for (uint32_t i = 0; i < numThreads; i++) {
             results.push_back(std::async(worker));
-
+        }
         return results;
     }
 

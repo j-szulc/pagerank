@@ -5,51 +5,38 @@
 #include "immutable/pageId.hpp"
 #include <unistd.h>
 #include <sys/wait.h>
+#include <fstream>
+#include <cstdio>
 
 #define BUF_SIZE 64
+#define FD_MAX 1023
 
 class Sha256IdGenerator : public IdGenerator {
 public:
+
     PageId generateId(std::string const &content) const {
-        int shaIn[2];
-        pipe(shaIn);
+        char shaIn[L_tmpnam];
+        char shaOut[L_tmpnam];
 
-        int shaOut[2];
-        pipe(shaOut);
+        tmpnam(shaIn);
+        std::ofstream shaInFile(shaIn);
+        tmpnam(shaOut);
 
-        int shaPID;
+        shaInFile << content;
+        shaInFile.close();
 
-        switch (shaPID = fork()) {
-            case -1:
-                break;
-            case 0:
-                close(0);
-                close(1);
+        std::string command = "sha256sum " + std::string{shaIn} + " | head -c 64 > " + std::string{shaOut};
+        std::system(command.c_str());
 
-                dup2(shaIn[0], 0);
-                dup2(shaOut[1], 1);
+        std::ifstream shaOutFile(shaOut);
+        std::string output;
+        shaOutFile >> output;
+        shaOutFile.close();
 
-                close(shaIn[0]);
-                close(shaIn[1]);
-                close(shaOut[0]);
-                close(shaOut[1]);
+        remove(shaIn);
+        remove(shaOut);
 
-                execlp("sha256sum", "sha256sum", NULL);
-        }
-        close(shaOut[1]);
-        close(shaIn[0]);
-
-        write(shaIn[1], content.c_str(), content.size());
-        close(shaIn[1]);
-
-        char buf[BUF_SIZE + 1];
-        int r = read(shaOut[0], buf, BUF_SIZE);
-        close(shaOut[0]);
-        buf[r] = '\0';
-
-        waitpid(shaPID, nullptr, 0);
-
-        return std::string(buf);
+        return output;
     }
 };
 
