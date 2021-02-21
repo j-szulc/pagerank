@@ -34,7 +34,7 @@ public:
     MultiThreadedPageRankComputer(uint32_t numThreadsArg)
             : numThreads(numThreadsArg) {};
 
-    // Distributes job(0),job(1),...,job(n) across multiple threads
+    // Distributes job(begin),job(next(begin)),...,job(prev(end)) across multiple threads
     // and returns future results.
     template<typename T, typename S, typename Iterator>
     std::vector<std::future<S>> pool(Iterator begin, Iterator end, std::function<void(T, S &)> work, S init) const {
@@ -61,6 +61,7 @@ public:
         for (uint32_t i = 0; i < numThreads; i++) {
             results.push_back(std::async(std::launch::async, worker));
         }
+
         return results;
     }
 
@@ -88,26 +89,25 @@ public:
         PageRankHashMap map1;
         PageRankHashMap map2;
 
-        double initialPageRank = 1.0 / network.getSize();
         for (auto const &page : pages) {
-            map1[page.getId()] = initialPageRank;
-            map2[page.getId()] = initialPageRank;
+            map1[page.getId()] = 1.0 / network.getSize();;
+            map2[page.getId()] = 1.0 / network.getSize();;
         }
 
         std::unordered_map<PageId, uint32_t, PageIdHash> numLinks;
-        for (auto page : pages) {
+        for (auto const &page : pages) {
             numLinks[page.getId()] = page.getLinks().size();
         }
 
         std::unordered_set<PageId, PageIdHash> danglingNodes;
-        for (auto page : pages) {
+        for (auto const &page : pages) {
             if (page.getLinks().size() == 0) {
                 danglingNodes.insert(page.getId());
             }
         }
 
         std::unordered_map<PageId, std::vector<PageId>, PageIdHash> edges;
-        for (auto page : pages) {
+        for (auto const &page : pages) {
             for (auto link : page.getLinks()) {
                 edges[link].push_back(page.getId());
             }
@@ -119,8 +119,11 @@ public:
         for (uint32_t i = 0; i < iterations; ++i) {
             swap(previousPageHashMap, pageHashMap);
 
-            std::function<void(PageId, double &)> summingFun = [&](PageId danglingNode, double &state) { state += (*previousPageHashMap)[danglingNode]; };
+            std::function<void(PageId, double &)> summingFun = [&](PageId danglingNode, double &state) {
+                state += (*previousPageHashMap)[danglingNode];
+            };
             auto dangleSumFutures = pool(danglingNodes.begin(), danglingNodes.end(), summingFun, (double) 0);
+
             double dangleSum = 0;
             for (auto &future : dangleSumFutures)
                 dangleSum += future.get();
