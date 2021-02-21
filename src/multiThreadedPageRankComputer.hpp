@@ -88,7 +88,7 @@ public:
         PageRankHashMap map1;
         PageRankHashMap map2;
 
-        auto initialPageRank = 1.0 / network.getSize();
+        double initialPageRank = 1.0 / network.getSize();
         for (auto const &page : pages) {
             map1[page.getId()] = initialPageRank;
             map2[page.getId()] = initialPageRank;
@@ -107,7 +107,7 @@ public:
         }
 
         std::unordered_map<PageId, std::vector<PageId>, PageIdHash> edges;
-        for (auto page : network.getPages()) {
+        for (auto page : pages) {
             for (auto link : page.getLinks()) {
                 edges[link].push_back(page.getId());
             }
@@ -125,8 +125,7 @@ public:
             }
             dangleSum = dangleSum * alpha;
 
-            double difference = 0;
-            for (auto &pageMapElem : *pageHashMap) {
+            std::function<void(PageRankHashMap::value_type & , double & )> processPageFun = [&](PageRankHashMap::value_type &pageMapElem, double &difference) {
                 PageId pageId = pageMapElem.first;
 
                 double danglingWeight = 1.0 / network.getSize();
@@ -138,16 +137,21 @@ public:
                     }
                 }
                 difference += std::abs((*previousPageHashMap)[pageId] - (*pageHashMap)[pageId]);
+            };
+
+            auto futures = pool(pageHashMap->begin(), pageHashMap->end(), processPageFun, (double) 0);
+            double difference = 0;
+            for (std::future<double> &future : futures) {
+                difference += future.get();
             }
 
-            std::vector<PageIdAndRank> result;
-            for (auto iter : *pageHashMap) {
-                result.push_back(PageIdAndRank(iter.first, iter.second));
-            }
-
-            ASSERT(result.size() == network.getSize(), "Invalid result size=" << result.size() << ", for network" << network);
 
             if (difference < tolerance) {
+                std::vector<PageIdAndRank> result;
+                for (auto iter : *pageHashMap) {
+                    result.push_back(PageIdAndRank(iter.first, iter.second));
+                }
+                ASSERT(result.size() == network.getSize(), "Invalid result size=" << result.size() << ", for network" << network);
                 return result;
             }
         }
