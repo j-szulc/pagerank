@@ -11,12 +11,12 @@
 class Sha256IdGenerator : public IdGenerator {
 public:
     PageId generateId(std::string const &content) const {
-        char shaIn[L_tmpnam] = "XXXXXX";
-        char shaOut[L_tmpnam] = "XXXXXX";
+        char shaIn[L_tmpnam];
+        char shaOut[L_tmpnam];
 
-        mkstemp(shaIn);
+        tmpnam(shaIn);
         std::ofstream shaInFile(shaIn);
-        mkstemp(shaOut);
+        tmpnam(shaOut);
 
         shaInFile << content;
         shaInFile.close();
