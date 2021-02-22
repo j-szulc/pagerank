@@ -31,6 +31,7 @@
 ## PageRank Performance Test
 
 - PC:
+
     ```
   [100 nodes, SingleThreadedPageRankComputer] took: 0.00717281s
   [1000 nodes, SingleThreadedPageRankComputer] took:   1.25302s
@@ -49,6 +50,7 @@
     ```
 
 - "Students":
+
     ```
   [100 nodes, SingleThreadedPageRankComputer] took: 0.0100106s
   [1000 nodes, SingleThreadedPageRankComputer] took:   1.49933s
@@ -65,6 +67,7 @@
   [500000 nodes, MultiThreadedPageRankComputer[4]] took:   13.2623s
   [500000 nodes, MultiThreadedPageRankComputer[8]] took:   17.7141s
      ```
+
 ## E2E Test
 
 - PC:
@@ -77,13 +80,14 @@
   [MultiThreadedPageRankComputer[8]] took:   1.53302s
   ```
 - "Students":
-    ```
-    [SingleThreadedPageRankComputer] took:   13.6398s
-    [MultiThreadedPageRankComputer[1]] took:   12.8399s
-    [MultiThreadedPageRankComputer[2]] took:   8.11722s
-    [MultiThreadedPageRankComputer[3]] took:   5.69364s
-    [MultiThreadedPageRankComputer[4]] took:   4.56782s
-    [MultiThreadedPageRankComputer[8]] took:    4.1929s
+
+  ```
+  [SingleThreadedPageRankComputer] took:   13.6398s
+  [MultiThreadedPageRankComputer[1]] took:   12.8399s
+  [MultiThreadedPageRankComputer[2]] took:   8.11722s
+  [MultiThreadedPageRankComputer[3]] took:   5.69364s
+  [MultiThreadedPageRankComputer[4]] took:   4.56782s
+  [MultiThreadedPageRankComputer[8]] took:    4.1929s
   ```
 
 Execution times do not decrease linearly, as the number of cores increase, because of the overhead of parallelization (as noted by the flame graphs below, most of the time is spent inside 'clone'
@@ -101,7 +105,7 @@ PageRank Performance Test:
 
   ![](studentsResult2.svg "studentsResult2")
 
-E2E Test:
+## E2E Test:
 
 - PC:
 
